@@ -45,7 +45,7 @@ namespace Oxide.Plugins
                 [JsonProperty(PropertyName = "Total Rockets for MLRS to fire")]
                 public int rocketAmount = 12;
 
-                [JsonProperty(PropertyName = "Rocket Interval Speed (in seconds)")]
+                [JsonProperty(PropertyName = "Rocket Launch Interval (in seconds)")]
                 public float launchTime = 0.5f;
 
                 [JsonProperty(PropertyName = "Requires Aiming Module")]
@@ -91,6 +91,7 @@ namespace Oxide.Plugins
                 StorageContainer dashboardContainer = entity.GetDashboardContainer();
                 dashboardContainer.inventory.SetFlag(ItemContainer.Flag.IsLocked, false);
             }
+            Puts("Aiming Modules now required to operate MLRS");
         }
 
         private void Loaded()
@@ -109,7 +110,7 @@ namespace Oxide.Plugins
             }
         }
 
-        private void OnEntitySpawned(BaseEntity entity) //Modifies any MLRS spawned in after Server Startup
+        private void OnEntitySpawned(BaseEntity entity)
         {
             if (entity == null || !(entity is MLRS)) return;
             MLRS mlrs = entity as MLRS;
@@ -121,11 +122,10 @@ namespace Oxide.Plugins
 
         }
 
-
         private object OnEntityTakeDamage(BaseCombatEntity entity, HitInfo info)
         {
             float newDam = (float)_config.defsettings.damageMod;
-            var player = entity as BasePlayer;
+            var victim = entity as BasePlayer;
 
             if (entity == null || info == null || info.WeaponPrefab == null) return null; //null checks
             if (info.WeaponPrefab.ShortPrefabName.Equals("rocket_mlrs"))
@@ -133,12 +133,21 @@ namespace Oxide.Plugins
                 if (newDam == null || newDam <= 0) return true; //disables all MLRS damage when modifier is 0 or below
 
                 //Checks Player Damage
-                if (entity is BasePlayer && _config.defsettings.pvPlayer) 
+                if (victim is BasePlayer && !victim.IsNpc && _config.defsettings.pvPlayer) 
                 {
                     info.damageTypes.ScaleAll(newDam);
                     return null;
                 }
-                if (entity is BasePlayer && !_config.defsettings.pvPlayer) return true;
+                if (victim is BasePlayer && !victim.IsNpc && !_config.defsettings.pvPlayer) return true;
+
+
+                //Checks for NPC Players
+                if (_config.defsettings.npc && (victim is NPCPlayer || entity is BaseNpc || entity is BaseAnimalNPC))
+                {
+                    info.damageTypes.ScaleAll(newDam);
+                    return null;
+                }
+                if (!_config.defsettings.npc && (victim is NPCPlayer || entity is BaseNpc || entity is BaseAnimalNPC)) return true;
 
                 //Checks for Raidable Bases and Abandoned Bases (bases with 0 ownership)
                 if (entity.OwnerID.Equals((ulong)0) && _config.defsettings.raidable) 
@@ -148,6 +157,7 @@ namespace Oxide.Plugins
                 }
                 if (entity.OwnerID.Equals((ulong)0) && !_config.defsettings.raidable) return true;
 
+
                 //Checks for Base entities owned by players
                 if (!entity.OwnerID.Equals((ulong)0) && _config.defsettings.pvBase) 
                 {
@@ -155,14 +165,6 @@ namespace Oxide.Plugins
                     return null;
                 }
                 if (!entity.OwnerID.Equals((ulong)0) && !_config.defsettings.pvBase) return true;
-
-                //Checks for NPC Players
-                if (_config.defsettings.npc && player is NPCPlayer)
-                {
-                    info.damageTypes.ScaleAll(newDam);
-                    return null;
-                }
-                if (!_config.defsettings.npc && player is NPCPlayer) return true;
 
             }
             return null;
@@ -217,7 +219,7 @@ namespace Oxide.Plugins
             Puts($"Total MLRS Rocket Capacity set to: {_config.defsettings.rocketAmount} rockets");
         }
 
-        private void UpdateMLRSContainers() //Modifies any MLRS spawned in after Server Startup
+        private void UpdateMLRSContainers()
         {
             foreach (var entity in UnityEngine.Object.FindObjectsOfType<MLRS>())
             {
