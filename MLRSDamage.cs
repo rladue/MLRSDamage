@@ -8,10 +8,12 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MLRS Damage", "iLakSkiL", "1.3.1")]
+    [Info("MLRS Damage", "iLakSkiL", "1.4.0")]
     [Description("Edits the damage down by the MLRS.")]
     public class MLRSDamage : RustPlugin
     {
+        [PluginReference]
+        private Plugin StackSizeController;
 
         #region Configuration
         private Configuration _config;
@@ -42,6 +44,13 @@ namespace Oxide.Plugins
 
                 [JsonProperty(PropertyName = "Total Rockets for MLRS to fire")]
                 public int rocketAmount = 12;
+
+                [JsonProperty(PropertyName = "Rocket Interval Speed (in seconds)")]
+                public float launchTime = 0.5f;
+
+                [JsonProperty(PropertyName = "Requires Aiming Module")]
+                public bool needModule = true;
+
             }
         }
 
@@ -74,34 +83,44 @@ namespace Oxide.Plugins
         private void Unload()
         {
             ConsoleSystem.Run(ConsoleSystem.Option.Server, "MLRS.brokenDownMinutes 10");
+            Puts("MLRS cooldown time reset to 10 minutes");
+            SetRocketSize(12);
+            Puts("MLRS total rockets to fire reset to 12");
             foreach (var entity in UnityEngine.Object.FindObjectsOfType<MLRS>())
             {
-                if (entity == null) continue;
-                if (entity is MLRS)
-                {
-                    var mlrsVeh = entity as MLRS;
-                    StorageContainer rocketContainer = mlrsVeh.GetRocketContainer();
-                    rocketContainer.inventory.maxStackSize = 6;
-                }
+                StorageContainer dashboardContainer = entity.GetDashboardContainer();
+                dashboardContainer.inventory.SetFlag(ItemContainer.Flag.IsLocked, false);
             }
-            Puts("MLRS cooldown time reset to 10 minutes");
-            Puts("MLRS total rockets to fire reset to 12");
         }
 
-        private void OnServerInitialized()
+        private void Loaded()
         {
             ConsoleSystem.Run(ConsoleSystem.Option.Server, $"MLRS.brokenDownMinutes {_config.defsettings.broken}"); //Sets MLRS cooldown timer
+            SetRocketSize(_config.defsettings.rocketAmount);
+
             foreach (var entity in UnityEngine.Object.FindObjectsOfType<MLRS>())
             {
-                if (entity == null) continue;
-                if (entity is MLRS)
+                if (entity == null || !(entity is MLRS)) return;
+                if (!_config.defsettings.needModule) ResetModule(entity);
+                NextTick(() =>
                 {
-                    var mlrsVeh = entity as MLRS;
-                    StorageContainer rocketContainer = mlrsVeh.GetRocketContainer();
-                    rocketContainer.inventory.maxStackSize = (_config.defsettings.rocketAmount / 2); //Sets container size in MLRS rocket holder
-                }
+                    UpdateMLRSContainers();
+                });
             }
         }
+
+        private void OnEntitySpawned(BaseEntity entity) //Modifies any MLRS spawned in after Server Startup
+        {
+            if (entity == null || !(entity is MLRS)) return;
+            MLRS mlrs = entity as MLRS;
+            if (!_config.defsettings.needModule) ResetModule(mlrs);
+            NextTick(() =>
+            {
+                UpdateMLRSContainer(mlrs);
+            });
+
+        }
+
 
         private object OnEntityTakeDamage(BaseCombatEntity entity, HitInfo info)
         {
@@ -149,11 +168,60 @@ namespace Oxide.Plugins
             return null;
         }
 
-        private void OnEntitySpawned(BaseEntity entity) //Modifies any MLRS spawned in after Server Startup
+        private void OnMlrsRocketFired(MLRS ent, ServerProjectile serverProjectile) 
         {
-            if (entity == null) return;
-            if (entity is MLRS)
+            if (ent.RocketAmmoCount > 12)
             {
+                ent.nextRocketIndex = (int)((ent.RocketAmmoCount % 12) + 1);
+            }
+            else ent.nextRocketIndex = ent.RocketAmmoCount - 1;
+        }
+
+        private object OnMlrsFire(MLRS ent, BasePlayer owner)
+        {
+            ent.SetFlag(BaseEntity.Flags.Reserved6, true, false, true);
+            ent.radiusModIndex = 0;
+            if (ent.RocketAmmoCount > 12)
+            {
+                ent.nextRocketIndex = (int)((ent.RocketAmmoCount % 12) + 1);
+            }
+            else ent.nextRocketIndex = ent.RocketAmmoCount - 1;
+            ent.rocketOwnerRef.Set(owner);
+            ent.InvokeRepeating(new Action(ent.FireNextRocket), 0f, _config.defsettings.launchTime);
+            Interface.CallHook("OnMlrsFired", ent, owner);
+            return true;
+        }
+        
+        private void OnMlrsFiringEnded(MLRS entity)
+        {
+            if (!_config.defsettings.needModule) ResetModule(entity);
+        }
+
+        #endregion
+
+        #region Helpers
+
+        public void SetRocketSize(int amount)
+        {
+            if (StackSizeController != null)
+            {
+                Puts("StackSizeController detected: Updating StackSizeController config");
+                StackSizeController.Call("UpdateIndividualItemStackSize", -1843426638, _config.defsettings.rocketAmount / 2);
+                Puts($"MLRS Rocket Ammo stack size is now set to {_config.defsettings.rocketAmount / 2}");
+            }
+            else
+            {
+                ItemManager.FindItemDefinition(-1843426638).stackable = (_config.defsettings.rocketAmount / 2);
+                Puts($"MLRS Rocket Ammo stack size is now set to {_config.defsettings.rocketAmount / 2}");
+            }
+            Puts($"Total MLRS Rocket Capacity set to: {_config.defsettings.rocketAmount} rockets");
+        }
+
+        private void UpdateMLRSContainers() //Modifies any MLRS spawned in after Server Startup
+        {
+            foreach (var entity in UnityEngine.Object.FindObjectsOfType<MLRS>())
+            {
+                if (entity == null || !(entity is MLRS)) return;
                 NextTick(() =>
                 {
                     var mlrsVeh = entity as MLRS;
@@ -163,10 +231,31 @@ namespace Oxide.Plugins
             }
         }
 
-        private void OnMlrsRocketFired(MLRS ent, ServerProjectile serverProjectile) 
+        private void UpdateMLRSContainer(MLRS entity)
         {
-            ent.nextRocketIndex = 1; //Makes MLRS Shoot more than default 12 rockets
+            if (entity == null || !(entity is MLRS)) return;
+            NextTick(() =>
+            {
+                var mlrsVeh = entity as MLRS;
+                StorageContainer rocketContainer = mlrsVeh.GetRocketContainer();
+                rocketContainer.inventory.maxStackSize = (_config.defsettings.rocketAmount / 2);
+            });
         }
+
+        private void ResetModule(MLRS entity)
+        {
+            timer.Once(2f, () =>
+                {
+                entity.VehicleFixedUpdate();
+                StorageContainer dashboardContainer = entity.GetDashboardContainer();
+                if (dashboardContainer.inventory.IsEmpty())
+                {
+                    dashboardContainer.inventory.AddItem(ItemManager.FindItemDefinition("aiming.module.mlrs"), 1, (ulong)0, ItemContainer.LimitStack.Existing);
+                }
+                dashboardContainer.inventory.SetFlag(ItemContainer.Flag.IsLocked, true);
+            });
+        }
+
         #endregion
 
         #region Commands
@@ -303,18 +392,62 @@ namespace Oxide.Plugins
             {
                 int.TryParse(arg.Args[0], out rocketsNum);
                 _config.defsettings.rocketAmount = rocketsNum;
+                SetRocketSize(rocketsNum);
+                UpdateMLRSContainers();
                 SaveConfig();
-                foreach (var entity in UnityEngine.Object.FindObjectsOfType<MLRS>())
-                {
-                    if (entity == null) continue;
-                    if (entity is MLRS)
-                    {
-                        var mlrsVeh = entity as MLRS;
-                        StorageContainer rocketContainer = mlrsVeh.GetRocketContainer();
-                        rocketContainer.inventory.maxStackSize = (_config.defsettings.rocketAmount / 2); //Sets container size in MLRS rocket holder
-                    }
-                }
-                Puts($"Total MLRS Rocket Capacity set to: {_config.defsettings.rocketAmount} rockets");
+            }
+        }
+
+        [ConsoleCommand("mlrsdamage.module")]
+        private void NeedModule(ConsoleSystem.Arg arg)
+        {
+            if (!arg.IsAdmin) return;
+            bool module;
+            if (arg.Args == null || !(bool.TryParse(arg.Args[0], out module)))
+            {
+                Puts("Error: Enter either true of false!");
+                return;
+            }
+            else
+            {
+                bool.TryParse(arg.Args[0], out module);
+                _config.defsettings.needModule = module;
+                SaveConfig();
+                if (_config.defsettings.needModule) Puts("An Aiming Module is no longer needed to activate the MLRS!");
+                if (!_config.defsettings.needModule) Puts("An Aiming Module will be needed to activate the MLRS!");
+            }
+        }
+
+        [ConsoleCommand("mlrsdamage.interval")]
+        private void LaunchInterval(ConsoleSystem.Arg arg)
+        {
+            if (!arg.IsAdmin) return;
+            float speed;
+            if (arg.Args == null || !(float.TryParse(arg.Args[0], out speed)))
+            {
+
+                Puts("Error: Must enter a number!");
+                return;
+            }
+            if (speed < 0)
+            {
+                Puts("Error: Missile interval cannot be a negative number");
+                return;
+            }
+            if (speed == 0 || (speed > 0 && speed < 0.1))
+            {
+                Puts("CAUTION: It is not advisable to have such a short interval on missile launches. You may encounter server issues.");
+                float.TryParse(arg.Args[0], out speed);
+                _config.defsettings.launchTime = speed;
+                SaveConfig();
+                Puts($"MLRS missile launch interval is now set for {_config.defsettings.launchTime} seconds!");
+            }
+            else
+            {
+                float.TryParse(arg.Args[0], out speed);
+                _config.defsettings.launchTime = speed;
+                SaveConfig();
+                Puts($"MLRS missile launch interval is now set for {_config.defsettings.launchTime} seconds!");
             }
         }
         #endregion
