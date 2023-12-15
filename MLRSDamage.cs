@@ -84,8 +84,12 @@ namespace Oxide.Plugins
         {
             ConsoleSystem.Run(ConsoleSystem.Option.Server, "MLRS.brokenDownMinutes 10");
             Puts("MLRS cooldown time reset to 10 minutes");
-            SetRocketSize(12);
-            Puts("MLRS total rockets to fire reset to 12");
+            
+            if (StackSizeController == null)
+            {
+                SetRocketSize(12);
+                Puts("MLRS total rockets to fire reset to 12");
+            }
             foreach (var entity in UnityEngine.Object.FindObjectsOfType<MLRS>())
             {
                 StorageContainer dashboardContainer = entity.GetDashboardContainer();
@@ -97,7 +101,14 @@ namespace Oxide.Plugins
         private void Loaded()
         {
             ConsoleSystem.Run(ConsoleSystem.Option.Server, $"MLRS.brokenDownMinutes {_config.defsettings.broken}"); //Sets MLRS cooldown timer
-            SetRocketSize(_config.defsettings.rocketAmount);
+
+            if (StackSizeController != null)
+            {
+                Puts($"StackSizeController detected. Setting rocketAmount to {(int)StackSizeController.Call("GetStackSize", -1843426638) * 2}");
+                _config.defsettings.rocketAmount = (int)StackSizeController.Call("GetStackSize", -1843426638) * 2;
+                SaveConfig();
+            }
+            else SetRocketSize(_config.defsettings.rocketAmount);
 
             foreach (var entity in UnityEngine.Object.FindObjectsOfType<MLRS>())
             {
