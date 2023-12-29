@@ -11,7 +11,9 @@ Allows you to modify the damage rate of the MLRS for Player bases, raidable/aban
 <strong>mlrsdamage.pvpbase {true/false}</strong>    - Enable/Disable player base damage done by MLRS<br />
 <strong>mlrsdamage.raidable {true/false}</strong>    - Enable/Disable raidable/abandoned base damage done by MLRS<br />
 <strong>mlrsdamage.npc {true/false}</strong>    - Enable/Disable NPC damage done by MLRS<br />
-<strong>mlrsdamage.rockets {amount}</strong>    - Change total capacity of rockets able to be stored/fired by MLRS<br />
+<strong>mlrsdamage.rockets {amount}</strong>    - Change total capacity of rockets able to be fired by MLRS<br />
+<strong>mlrsdamage.module {true/false}</strong>    - Enable/Disable the need for an Aiming Module<br />
+<strong>mlrsdamage.interval {amount}</strong>    - Change the interval between rocket launches<br />
 
 <h2>Configuration</h2>
 <code>"MLRS Settings": {<br />
@@ -22,4 +24,6 @@ Allows you to modify the damage rate of the MLRS for Player bases, raidable/aban
     "Allow Damage to NPCs": true,                               // allow damage to NPCs on the map<br />
     "MLRS Cooldown time (in minutes)": 10.0                     // cooldown timer for MLRS, default is 10<br />
     "Total Rockets for MLRS to fire": 12                        // total number of rockets to shoot in a single barrage, default is 12<br />
+    "Rocket Launch Interval (in seconds)": 0.5,                 // time inbetween rocket launches. Must be positive, but can cause issues if set lower than 0.1<br />
+    "Requires Aiming Module": false                             // When set to true, an aiming module is always put in the MLRS and is locked from being looted by players<br />
   }</code>
