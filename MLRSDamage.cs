@@ -12,17 +12,7 @@ namespace Oxide.Plugins
     [Description("Edits the damage down by the MLRS.")]
     public class MLRSDamage : RustPlugin
     {
-        /// <summary>
-        /// To Do
-        /// 
-        /// Add min/max when launching rockets
-        /// 
-        /// When launching rockets, get rocket ammo
-        /// if rocket ammo is more than rocket launch amount, use smaller number
-        /// 
-        ///
-        /// 
-        /// </summary>
+
         int rocketsFired = 0;
 
         #region Configuration
