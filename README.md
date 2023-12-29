@@ -11,7 +11,7 @@ Allows you to modify the damage rate of the MLRS for Player bases, raidable/aban
 <strong>mlrsdamage.pvpbase {true/false}</strong>    - Enable/Disable player base damage done by MLRS<br />
 <strong>mlrsdamage.raidable {true/false}</strong>    - Enable/Disable raidable/abandoned base damage done by MLRS<br />
 <strong>mlrsdamage.npc {true/false}</strong>    - Enable/Disable NPC damage done by MLRS<br />
-<strong>mlrsdamage.rockets {amount}</strong>    - Change total capacity of rockets able to be stored/fired by MLRS<br />
+<strong>mlrsdamage.rockets {amount}</strong>    - Change total capacity of rockets able to be fired by MLRS<br />
 <strong>mlrsdamage.module {true/false}</strong>    - Enable/Disable the need for an Aiming Module<br />
 <strong>mlrsdamage.interval {amount}</strong>    - Change the interval between rocket launches<br />
 
