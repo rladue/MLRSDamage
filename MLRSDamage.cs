@@ -214,7 +214,7 @@ namespace Oxide.Plugins
 
         #endregion
 
-            #region Helpers
+        #region Helpers
 
         public void SetRocketAmount(int amount)
         {
