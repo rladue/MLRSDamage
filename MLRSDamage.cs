@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MLRS Damage", "iLakSkiL", "1.5.0")]
+    [Info("MLRS Damage", "iLakSkiL", "1.5.1")]
     [Description("Edits the damage down by the MLRS.")]
     public class MLRSDamage : RustPlugin
     {
@@ -179,7 +179,7 @@ namespace Oxide.Plugins
             }
             if (ent.RocketAmmoCount > 12)
             {
-                ent.nextRocketIndex = (int)((ent.RocketAmmoCount % 12) + 1);
+                ent.nextRocketIndex = (int)((ent.RocketAmmoCount % 11) + 1);
                 rocketsFired++;
                 return;
             }
@@ -197,7 +197,7 @@ namespace Oxide.Plugins
             ent.radiusModIndex = 0;
             if (ent.RocketAmmoCount > 12)
             {
-                ent.nextRocketIndex = (int)((ent.RocketAmmoCount % 12) + 1);
+                ent.nextRocketIndex = (int)((ent.RocketAmmoCount % 11) + 1);
             }
             else ent.nextRocketIndex = ent.RocketAmmoCount - 1;
             ent.rocketOwnerRef.Set(owner);
